@@ -68,10 +68,41 @@ public class ArtifactoryMojo extends AbstractMojo {
     @Override
     public void execute() {
         if (session.getRequest().getData().putIfAbsent("configured", Boolean.TRUE) == null) {
+            handlePathsWithSpaces();
             replaceVariables();
             setupProxy();
             enforceResolution();
             enforceDeployment();
+        }
+    }
+
+    /**
+     * Check for paths with spaces and handle them properly.
+     * This method ensures that paths containing spaces are properly quoted,
+     * which is especially important when running in environments like Azure Pipelines.
+     */
+    private void handlePathsWithSpaces() {
+        // Check the base directory of the current project
+        String baseDir = project.getBasedir().getAbsolutePath();
+        if (baseDir != null && baseDir.contains(" ")) {
+            getLog().info("Project base directory contains spaces, path: " + baseDir);
+            String preparedBaseDir = Utils.prepareFilePathForCli(baseDir);
+            System.setProperty("project.basedir", preparedBaseDir);
+            getLog().debug("Prepared base directory for CLI: " + preparedBaseDir);
+        }
+        
+        // Check the POM file path
+        if (project.getFile() != null) {
+            String pomPath = project.getFile().getAbsolutePath();
+            if (pomPath != null && pomPath.contains(" ")) {
+                getLog().info("POM file path contains spaces, path: " + pomPath);
+                String preparedPomPath = Utils.prepareFilePathForCli(pomPath);
+                System.setProperty("maven.pom.file", preparedPomPath);
+                getLog().debug("Prepared POM path for CLI: " + preparedPomPath);
+                
+                // Also handle Maven specific properties
+                System.setProperty("maven.multiModuleProjectDirectory", project.getBasedir().getAbsolutePath());
+            }
         }
     }
 
@@ -87,17 +118,17 @@ public class ArtifactoryMojo extends AbstractMojo {
      * Set up proxy from settings.xml, if not provided.
      */
     private void setupProxy() {
-        if (this.proxy.getHost() != null) {
+        if (this.proxy.delegate.getHost() != null) {
             return;
         }
         Proxy proxy = session.getSettings().getActiveProxy();
         if (proxy == null) {
             return;
         }
-        this.proxy.setHost(proxy.getHost());
-        this.proxy.setPort(proxy.getPort());
-        this.proxy.setUsername(proxy.getUsername());
-        this.proxy.setPassword(proxy.getPassword());
+        this.proxy.delegate.setHost(proxy.getHost());
+        this.proxy.delegate.setPort(proxy.getPort());
+        this.proxy.delegate.setUsername(proxy.getUsername());
+        this.proxy.delegate.setPassword(proxy.getPassword());
     }
 
     /**
@@ -164,6 +195,8 @@ public class ArtifactoryMojo extends AbstractMojo {
         if (buildInfo.getBuildRetentionDays() != null) {
             buildInfo.setBuildRetentionMinimumDate(buildInfo.getBuildRetentionDays().toString());
         }
+        
+        // Path handling is now done in handlePathsWithSpaces() method
     }
 
     /**

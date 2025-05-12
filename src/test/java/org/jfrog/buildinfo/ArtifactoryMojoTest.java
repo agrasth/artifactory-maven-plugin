@@ -4,7 +4,10 @@ import org.apache.maven.artifact.repository.ArtifactRepository;
 import org.apache.maven.project.MavenProject;
 import org.jfrog.build.extractor.ci.BuildInfoFields;
 import org.jfrog.build.extractor.clientConfiguration.ArtifactoryClientConfiguration;
+import org.jfrog.buildinfo.utils.Utils;
 
+import java.io.File;
+import java.lang.reflect.Method;
 import java.util.List;
 import java.util.Map;
 
@@ -120,5 +123,43 @@ public class ArtifactoryMojoTest extends ArtifactoryMojoTestBase {
             assertFalse(releasesRepo.getSnapshots().isEnabled());
             assertTrue(releasesRepo.getReleases().isEnabled());
         }
+    }
+    
+    /**
+     * Test that file paths with spaces are properly quoted by our utility methods
+     */
+    public void testFilePathQuoting() {
+        // Test paths with spaces
+        String pathWithSpaces = "/test/path with spaces/pom.xml";
+        String quoted = Utils.quotePathIfNeeded(pathWithSpaces);
+        assertTrue(quoted.startsWith("\""));
+        assertTrue(quoted.endsWith("\""));
+        
+        // Test CLI path preparation
+        String preparedPath = Utils.prepareFilePathForCli(pathWithSpaces);
+        assertTrue(preparedPath.contains(" "));
+        if (File.separatorChar == '\\') {
+            assertTrue(preparedPath.startsWith("\""));
+            assertTrue(preparedPath.endsWith("\""));
+        }
+    }
+    
+    /**
+     * Test that System properties are properly set for paths with spaces
+     */
+    public void testSystemPropertiesForPaths() {
+        // Set up some test paths with spaces
+        File testPomFile = new File("/test/path with spaces/pom.xml");
+        String quotedPath = Utils.quotePathIfNeeded(testPomFile.getAbsolutePath());
+        
+        // Set system property
+        System.setProperty("maven.pom.file", quotedPath);
+        
+        // Verify correct quoting
+        String pomPath = System.getProperty("maven.pom.file");
+        assertNotNull(pomPath);
+        assertTrue(pomPath.startsWith("\""));
+        assertTrue(pomPath.endsWith("\""));
+        assertTrue(pomPath.contains(" "));
     }
 }

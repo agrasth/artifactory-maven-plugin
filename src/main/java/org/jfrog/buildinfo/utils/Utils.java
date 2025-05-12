@@ -181,6 +181,60 @@ public class Utils {
     }
 
     /**
+     * Properly quotes a file path if it contains spaces to ensure it's handled correctly
+     * by command line tools like Maven.
+     *
+     * @param filePath - The file path that may contain spaces
+     * @return The properly quoted file path
+     */
+    public static String quotePathIfNeeded(String filePath) {
+        if (filePath != null && filePath.contains(" ")) {
+            // On Windows, we need to ensure the path is properly quoted
+            if (File.separatorChar == '\\') {
+                // Escape any existing quotes first
+                filePath = filePath.replace("\"", "\\\"");
+                // Make sure backslashes are properly escaped
+                filePath = filePath.replace("\\", "\\\\");
+                return "\"" + filePath + "\"";
+            } else {
+                // For Unix-like systems, we can just quote the path
+                return "\"" + filePath + "\"";
+            }
+        }
+        return filePath;
+    }
+
+    /**
+     * Prepares a file path for safe use in command line execution, particularly
+     * for integration with external tools like JFrog CLI.
+     * 
+     * @param filePath - The file path to prepare
+     * @return The prepared file path ready for command line use
+     */
+    public static String prepareFilePathForCli(String filePath) {
+        if (filePath == null) {
+            return null;
+        }
+        
+        // First, normalize the path to use the correct slashes for the current OS
+        filePath = filePath.replace('/', File.separatorChar).replace('\\', File.separatorChar);
+        
+        // If the path contains spaces, we need to handle it differently based on OS
+        if (filePath.contains(" ")) {
+            if (File.separatorChar == '\\') {
+                // Windows: ensure proper escaping for Windows-specific tools
+                // JFrog CLI on Windows needs special handling for paths with spaces
+                return quotePathIfNeeded(filePath);
+            } else {
+                // Unix/Linux/macOS: standard quoting is usually sufficient
+                return "\"" + filePath + "\"";
+            }
+        }
+        
+        return filePath;
+    }
+
+    /**
      * Parse "{{var1|var2|var3}}" entries in the value specified to their corresponding environment variables
      * or system properties. Last variable is the fallback (default) value if wrapped in double quotes.
      *
